@@ -1,0 +1,24 @@
+{
+    "files.encoding": "utf8",
+    "files.eol": "\n",
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.rulers": [
+        120
+    ],
+    "emmet.includeLanguages": {
+        "php": "html"
+    },
+    "intelephense.files.maxSize": 3000000,
+    "intelephense.stubs": [
+        "apache",
+        "core",
+        "pdo",
+        "json",
+        "mbstring",
+        "openssl",
+        "sqlite3"
+    ]
+}

@@ -1,0 +1,25 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Сайт: запустить локальный сервер",
+            "type": "shell",
+            "command": "php -S localhost:8000 -t public",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "База: создать демо-базу SQLite",
+            "type": "shell",
+            "command": "php tools/demo-db.php",
+            "problemMatcher": []
+        }
+    ]
+}
