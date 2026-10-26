@@ -1,0 +1,7 @@
+/storage/*.sqlite
+/storage/*.sqlite-journal
+/storage/backups/*.sql
+/storage/backups/*.bak
+.DS_Store
+Thumbs.db
+*.log
