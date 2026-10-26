@@ -68,6 +68,11 @@ a:hover {
     text-decoration-thickness: 1px;
 }
 
+:focus-visible {
+    outline: 1px solid var(--fg);
+    outline-offset: 3px;
+}
+
 p {
     margin: 0 0 1em;
 }
@@ -492,8 +497,9 @@ select option {
 }
 
 .event-row-date .day {
-    font-size: 18px;
-    letter-spacing: -0.02em;
+    font-size: clamp(22px, 2.1vw, 30px);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
     color: var(--fg);
 }
 

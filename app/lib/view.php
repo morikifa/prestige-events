@@ -4,7 +4,7 @@ function render(string $template, array $data = []): void
 {
     $data['currentUser'] = current_user();
     $data['flashes'] = flash_pull();
-    $data['theme'] = $_SESSION['theme'] ?? 'dark';
+    $data['theme'] = $_SESSION['theme'] ?? 'light';
     $data['navActive'] = $data['navActive'] ?? '';
 
     extract($data, EXTR_SKIP);

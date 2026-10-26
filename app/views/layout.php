@@ -1,7 +1,7 @@
 <?php
 $title = $title ?? config('app.name');
 $currentUser = $currentUser ?? current_user();
-$theme = $theme ?? 'dark';
+$theme = $theme ?? 'light';
 $flashes = $flashes ?? [];
 $bodyClass = 'theme-' . ($theme === 'light' ? 'light' : 'dark');
 ?>

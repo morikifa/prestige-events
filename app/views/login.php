@@ -1,7 +1,7 @@
 <section class="auth">
     <p class="label">Личный кабинет</p>
     <h1 class="auth-title">Вход</h1>
-    <p class="auth-hint">Войдите по адресу электронной почты и паролю. Интерфейс откроется в соответствии с вашей ролью.</p>
+    <p class="auth-hint">Войдите по адресу электронной почты и паролю. Можно указать короткий логин — часть адреса до знака @.</p>
 
     <?php if (!empty($error)): ?>
         <div class="alert"><?= e($error) ?></div>
@@ -10,8 +10,8 @@
     <form class="form" method="post" action="<?= e(url('login')) ?>">
         <?= csrf_field() ?>
         <div class="field">
-            <label class="label" for="email">Электронная почта</label>
-            <input type="email" id="email" name="email" value="<?= e($email) ?>" autocomplete="username" required autofocus>
+            <label class="label" for="email">Электронная почта или логин</label>
+            <input type="text" id="email" name="email" value="<?= e($email) ?>" autocomplete="username" required autofocus>
         </div>
         <div class="field">
             <label class="label" for="password">Пароль</label>
@@ -26,9 +26,9 @@
     <div class="auth-alt">
         <p class="label">Демонстрационные учётные записи</p>
         <p class="form-note">
-            admin@prestige.ru / admin1234 — администратор<br>
-            organizer@prestige.ru / org1234 — организатор<br>
-            user@prestige.ru / user1234 — участник
+            admin / admin1234 — администратор<br>
+            organizer / org1234 — организатор<br>
+            user / user1234 — участник
         </p>
     </div>
 </section>

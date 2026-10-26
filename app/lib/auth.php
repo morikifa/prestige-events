@@ -130,6 +130,13 @@ function authenticate(string $login, string $password): array
         return ['error' => 'Слишком много попыток входа. Повторите через ' . ceil($wait / 60) . ' мин.'];
     }
 
+    if (strpos($login, '@') === false) {
+        $matches = db_all('SELECT LOWER(email) AS email FROM users WHERE LOWER(email) LIKE ?', [$login . '@%']);
+        if (count($matches) === 1) {
+            $login = $matches[0]['email'];
+        }
+    }
+
     $row = db_one(
         'SELECT u.*, r.code AS role_code
          FROM users u
