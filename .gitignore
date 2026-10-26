@@ -1,0 +1,10 @@
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/backups/*.db
+data/backups/*.bak
+*.log
+.vscode/
+.DS_Store
+Thumbs.db
