@@ -33,7 +33,6 @@ $platformTitle = isset($pdo) ? getSetting($pdo, 'platform_title', 'Prestige Even
 <a href="cabinet.php">Кабинет<?php if ($unreadCount > 0): ?> (<?= $unreadCount ?>)<?php endif; ?></a>
 <?php if ($headerUser['role_code'] === 'organizer' || $headerUser['role_code'] === 'admin'): ?>
 <a href="organizer.php">Организатор</a>
-<a href="reports.php">Отчёты</a>
 <?php endif; ?>
 <?php if ($headerUser['role_code'] === 'admin'): ?>
 <a href="admin.php">Админ</a>

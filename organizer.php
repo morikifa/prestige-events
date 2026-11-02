@@ -51,8 +51,12 @@ if ($user['role_code'] === 'admin') {
 }
 
 $totalParts = 0;
+$totalAttended = 0;
 foreach ($events as $ev) {
     $totalParts += registeredCount($pdo, $ev['id']);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM registrations WHERE event_id = ? AND status = 'attended'");
+    $stmt->execute([$ev['id']]);
+    $totalAttended += (int) $stmt->fetchColumn();
 }
 
 require __DIR__ . '/includes/header.php';
@@ -65,23 +69,40 @@ require __DIR__ . '/includes/header.php';
 <div class="card"><strong><?= count($events) ?></strong><span>Мероприятий</span></div>
 <div class="card"><strong><?= $totalParts ?></strong><span>Записей участников</span></div>
 <div class="card"><strong><?= $user['role_code'] === 'admin' ? 'Все' : 'Мои' ?></strong><span>Область доступа</span></div>
-<div class="card"><strong><a href="reports.php" style="text-decoration:none">Отчёты</a></strong><span>Сводка и CSV</span></div>
+<div class="card"><strong><?= $totalAttended ?></strong><span>Отмечено посещений</span></div>
 </div>
 
-<p><a class="btn" href="event_edit.php">Новое мероприятие</a></p>
+<p class="actions"><a class="btn" href="event_edit.php">Новое мероприятие</a> <a class="btn btn-light" href="export.php?mode=summary">Скачать сводку CSV</a></p>
 
-<h3 class="section">Мероприятия в базе данных</h3>
+<h3 class="section">Мероприятия и сводка</h3>
+<p class="grey">Колонки «Посетило», «Ожидание» и «Заполнено» считаются из таблиц registrations и waitlist при открытии страницы. Для администратора здесь показаны все мероприятия, для организатора — только свои.</p>
 <?php if (!$events): ?>
 <p class="empty">Мероприятий пока нет. Создайте первое кнопкой выше.</p>
 <?php else: ?>
 <table>
-<tr><th>Название</th><th>Дата</th><th>Категория</th><th>Участники</th><th>Статус в БД</th><th>Действия</th></tr>
+<tr><th>Название</th><th>Дата</th><th>Категория</th><th>Записано</th><th>Посетило</th><th>Ожидание</th><th>Заполнено</th><th>Статус в БД</th><th>Действия</th></tr>
 <?php foreach ($events as $ev): ?>
+<?php
+$regCount = registeredCount($pdo, $ev['id']);
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM registrations WHERE event_id = ? AND status = 'attended'");
+$stmt->execute([$ev['id']]);
+$attendedCount = (int) $stmt->fetchColumn();
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM waitlist WHERE event_id = ? AND status = 'waiting'");
+$stmt->execute([$ev['id']]);
+$waitingCount = (int) $stmt->fetchColumn();
+$fill = '—';
+if ($ev['capacity']) {
+    $fill = round($regCount * 100 / (int) $ev['capacity']) . '%';
+}
+?>
 <tr>
 <td><a href="event.php?id=<?= (int) $ev['id'] ?>"><?= e($ev['title']) ?></a><br><span class="grey"><?= e($ev['slug']) ?></span></td>
 <td><?= formatDate($ev['starts_at']) ?></td>
 <td><?= e($ev['category_name']) ?></td>
-<td><?= registeredCount($pdo, $ev['id']) ?><?= $ev['capacity'] !== null ? ' / ' . e($ev['capacity']) : '' ?></td>
+<td><?= $regCount ?><?= $ev['capacity'] !== null ? ' / ' . e($ev['capacity']) : '' ?></td>
+<td><?= $attendedCount ?></td>
+<td><?= $waitingCount ?></td>
+<td><?= e($fill) ?></td>
 <td>
 <form method="post" class="inline-form">
 <?= csrfField() ?>
@@ -97,8 +118,7 @@ require __DIR__ . '/includes/header.php';
 </td>
 <td>
 <div class="actions">
-<a class="btn btn-light btn-small" href="event_edit.php?id=<?= (int) $ev['id'] ?>">Изменить</a>
-<a class="btn btn-light btn-small" href="program.php?event_id=<?= (int) $ev['id'] ?>">Программа</a>
+<a class="btn btn-light btn-small" href="event_edit.php?id=<?= (int) $ev['id'] ?>">Изменить и программа</a>
 <a class="btn btn-light btn-small" href="participants.php?event_id=<?= (int) $ev['id'] ?>">Участники</a>
 <form method="post" data-confirm="Удалить мероприятие из базы? Программа и записи удалятся по внешним ключам.">
 <?= csrfField() ?>

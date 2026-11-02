@@ -6,8 +6,15 @@ $user = currentUser($pdo);
 requireRole($user, ['organizer', 'admin']);
 $pageTitle = 'Участники';
 $eventId = (int) ($_GET['event_id'] ?? 0);
+$tokenFromLink = trim($_GET['token'] ?? ($_POST['token'] ?? ''));
 $message = trim($_GET['msg'] ?? '');
 $error = '';
+
+if ($eventId === 0 && $tokenFromLink !== '') {
+    $stmt = $pdo->prepare('SELECT event_id FROM registrations WHERE qr_token = ?');
+    $stmt->execute([$tokenFromLink]);
+    $eventId = (int) $stmt->fetchColumn();
+}
 
 $stmt = $pdo->prepare('SELECT * FROM events WHERE id = ?');
 $stmt->execute([$eventId]);
@@ -117,7 +124,7 @@ require __DIR__ . '/includes/header.php';
 <p class="actions">
 <a class="btn btn-light" href="export.php?event_id=<?= $eventId ?>&format=csv">Список CSV</a>
 <a class="btn btn-light" href="export.php?event_id=<?= $eventId ?>&format=xls">Список Excel (XLS)</a>
-<a class="btn btn-light" href="program.php?event_id=<?= $eventId ?>">Программа</a>
+<a class="btn btn-light" href="event_edit.php?id=<?= $eventId ?>#program">Программа</a>
 </p>
 
 <h3 class="section">Отметка посещения по токену</h3>
@@ -125,9 +132,9 @@ require __DIR__ . '/includes/header.php';
 <?= csrfField() ?>
 <input type="hidden" name="action" value="checkin">
 <label>Токен из QR-кода билета</label>
-<input type="text" name="token" required placeholder="Вставьте токен участника">
+<input type="text" name="token" required placeholder="Вставьте токен участника" value="<?= e($tokenFromLink) ?>">
 <p style="margin-top:12px"><button class="btn" type="submit">Отметить посещение</button></p>
-<p class="grey">Тот же результат даёт переход по ссылке из QR-кода на страницу checkin.php под учётной записью организатора.</p>
+<p class="grey">Ссылка из QR-кода открывает эту страницу и подставляет токен. Организатору остаётся проверить участника в таблице ниже и нажать кнопку.</p>
 </form>
 
 <h3 class="section">Записи в таблице registrations</h3>

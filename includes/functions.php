@@ -27,14 +27,6 @@ function formatDate($value)
     return date('d.m.Y H:i', strtotime($value));
 }
 
-function formatDay($value)
-{
-    if (!$value) {
-        return '';
-    }
-    return date('d.m.Y', strtotime($value));
-}
-
 function inputDate($value)
 {
     if (!$value) {
@@ -234,7 +226,7 @@ function checkinUrl($token)
     }
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost:8000';
     $path = rtrim(str_replace(basename($_SERVER['SCRIPT_NAME'] ?? ''), '', $_SERVER['SCRIPT_NAME'] ?? '/'), '/');
-    return $protocol . '://' . $host . $path . '/checkin.php?token=' . urlencode($token);
+    return $protocol . '://' . $host . $path . '/participants.php?token=' . urlencode($token);
 }
 
 function canEditEvent($user, $event)
