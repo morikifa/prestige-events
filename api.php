@@ -1,6 +1,6 @@
 <?php
-require __DIR__ . '/includes/db.php';
-require __DIR__ . '/includes/functions.php';
+require __DIR__ . '/db.php';
+require __DIR__ . '/core.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $user = currentUser($pdo);
@@ -19,9 +19,7 @@ if ($action === 'unread') {
 
 if ($action === 'free') {
     $id = (int) ($_GET['event_id'] ?? 0);
-    $stmt = $pdo->prepare('SELECT * FROM events WHERE id = ?');
-    $stmt->execute([$id]);
-    $event = $stmt->fetch();
+    $event = eventById($pdo, $id);
     if (!$event) {
         echo json_encode(['error' => 'not_found']);
         exit;

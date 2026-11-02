@@ -6,28 +6,6 @@ document.addEventListener('DOMContentLoaded', function () {
             nav.classList.toggle('open');
         });
     }
-    var unread = document.getElementById('unreadCount');
-    if (unread) {
-        var updateUnread = function () {
-            fetch('api.php?action=unread').then(function (response) {
-                return response.json();
-            }).then(function (data) {
-                unread.textContent = data.count > 0 ? ' (' + data.count + ')' : '';
-            });
-        };
-        setInterval(updateUnread, 5000);
-    }
-    var refreshFree = document.getElementById('refreshFree');
-    if (refreshFree) {
-        refreshFree.addEventListener('click', function () {
-            fetch('api.php?action=free&event_id=' + encodeURIComponent(refreshFree.getAttribute('data-event')))
-                .then(function (response) {
-                    return response.json();
-                }).then(function (data) {
-                    document.getElementById('freePlaces').textContent = data.free === null ? 'без ограничения' : data.free;
-                });
-        });
-    }
     var forms = document.querySelectorAll('form[data-confirm]');
     forms.forEach(function (form) {
         form.addEventListener('submit', function (event) {
@@ -61,6 +39,28 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('Дата окончания не может быть раньше даты начала.');
                 event.preventDefault();
             }
+        });
+    }
+    var unread = document.getElementById('unreadCount');
+    if (unread) {
+        var updateUnread = function () {
+            fetch('api.php?action=unread').then(function (response) {
+                return response.json();
+            }).then(function (data) {
+                unread.textContent = data.count > 0 ? ' (' + data.count + ')' : '';
+            });
+        };
+        setInterval(updateUnread, 5000);
+    }
+    var refreshFree = document.getElementById('refreshFree');
+    if (refreshFree) {
+        refreshFree.addEventListener('click', function () {
+            fetch('api.php?action=free&event_id=' + encodeURIComponent(refreshFree.getAttribute('data-event')))
+                .then(function (response) {
+                    return response.json();
+                }).then(function (data) {
+                    document.getElementById('freePlaces').textContent = data.free === null ? 'без ограничения' : data.free;
+                });
         });
     }
 });
