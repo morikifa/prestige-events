@@ -8,17 +8,6 @@ function e($value)
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
-function insertedId($pdo)
-{
-    if (($GLOBALS['dbType'] ?? 'sqlite') === 'sqlsrv') {
-        $value = $pdo->query('SELECT CAST(@@IDENTITY AS INT)')->fetchColumn();
-        if ($value !== false && $value !== null) {
-            return (int) $value;
-        }
-    }
-    return (int) $pdo->lastInsertId();
-}
-
 function redirect($url)
 {
     header('Location: ' . $url);
@@ -32,31 +21,35 @@ function nowText()
 
 function formatDate($value)
 {
-    if (!$value) {
-        return '';
-    }
-    return date('d.m.Y H:i', strtotime($value));
+    return $value ? date('d.m.Y H:i', strtotime($value)) : '';
 }
 
 function inputDate($value)
 {
-    if (!$value) {
-        return '';
-    }
-    return date('Y-m-d\TH:i', strtotime($value));
+    return $value ? date('Y-m-d\TH:i', strtotime($value)) : '';
 }
 
 function saveDate($value)
 {
-    $value = trim((string) $value);
+    $value = str_replace('T', ' ', trim((string) $value));
     if ($value === '') {
         return null;
     }
-    $value = str_replace('T', ' ', $value);
     if (strlen($value) === 16) {
         $value .= ':00';
     }
     return $value;
+}
+
+function insertedId($pdo)
+{
+    if (($GLOBALS['dbType'] ?? 'sqlite') === 'sqlsrv') {
+        $value = $pdo->query('SELECT CAST(@@IDENTITY AS INT)')->fetchColumn();
+        if ($value !== false && $value !== null) {
+            return (int) $value;
+        }
+    }
+    return (int) $pdo->lastInsertId();
 }
 
 function currentUser($pdo)
@@ -74,16 +67,16 @@ function currentUser($pdo)
     return $user;
 }
 
-function requireLogin($user)
+function needLogin($user)
 {
     if (!$user) {
-        redirect('login.php');
+        redirect('account.php?p=login');
     }
 }
 
-function requireRole($user, $roles)
+function needRole($user, $roles)
 {
-    requireLogin($user);
+    needLogin($user);
     if (!in_array($user['role_code'], $roles, true)) {
         redirect('index.php');
     }
@@ -113,6 +106,13 @@ function logAction($pdo, $userId, $action, $entity, $entityId)
     }
 }
 
+function queueEmail($pdo, $userId, $eventId, $type, $subject, $message)
+{
+    $sender = getSetting($pdo, 'email_sender_name', 'Prestige Events');
+    $stmt = $pdo->prepare('INSERT INTO notifications (user_id, event_id, type, channel, subject, message, status, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)');
+    $stmt->execute([$userId, $eventId, $type, 'email', $subject, 'Отправитель: ' . $sender . "\r\n\r\n" . $message, 'pending', nowText()]);
+}
+
 function notify($pdo, $userId, $eventId, $type, $subject, $message, $withEmail = false)
 {
     $stmt = $pdo->prepare('INSERT INTO notifications (user_id, event_id, type, channel, subject, message, status, is_read, created_at, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)');
@@ -122,23 +122,13 @@ function notify($pdo, $userId, $eventId, $type, $subject, $message, $withEmail =
     }
 }
 
-function queueEmail($pdo, $userId, $eventId, $type, $subject, $message)
-{
-    $sender = getSetting($pdo, 'email_sender_name', 'Prestige Events');
-    $stmt = $pdo->prepare('INSERT INTO notifications (user_id, event_id, type, channel, subject, message, status, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)');
-    $stmt->execute([$userId, $eventId, $type, 'email', $subject, 'Отправитель: ' . $sender . "\r\n\r\n" . $message, 'pending', nowText()]);
-}
-
 function getSetting($pdo, $key, $defaultValue)
 {
     try {
         $stmt = $pdo->prepare('SELECT setting_value FROM settings WHERE setting_key = ?');
         $stmt->execute([$key]);
         $value = $stmt->fetchColumn();
-        if ($value === false) {
-            return $defaultValue;
-        }
-        return $value;
+        return $value === false ? $defaultValue : $value;
     } catch (PDOException $error) {
         return $defaultValue;
     }
@@ -157,10 +147,7 @@ function freePlaces($pdo, $event)
         return null;
     }
     $free = (int) $event['capacity'] - registeredCount($pdo, $event['id']);
-    if ($free < 0) {
-        return 0;
-    }
-    return $free;
+    return $free < 0 ? 0 : $free;
 }
 
 function makeToken()
@@ -222,32 +209,23 @@ function userStatusName($status)
 
 function fullName($user)
 {
-    $name = trim($user['last_name'] . ' ' . $user['first_name'] . ' ' . ($user['middle_name'] ?? ''));
-    return $name;
+    return trim($user['last_name'] . ' ' . $user['first_name'] . ' ' . ($user['middle_name'] ?? ''));
 }
 
 function makeSlug($title)
 {
     $map = ['а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd', 'е' => 'e', 'ё' => 'e', 'ж' => 'zh', 'з' => 'z', 'и' => 'i', 'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n', 'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't', 'у' => 'u', 'ф' => 'f', 'х' => 'h', 'ц' => 'c', 'ч' => 'ch', 'ш' => 'sh', 'щ' => 'sch', 'ъ' => '', 'ы' => 'y', 'ь' => '', 'э' => 'e', 'ю' => 'yu', 'я' => 'ya', 'А' => 'a', 'Б' => 'b', 'В' => 'v', 'Г' => 'g', 'Д' => 'd', 'Е' => 'e', 'Ё' => 'e', 'Ж' => 'zh', 'З' => 'z', 'И' => 'i', 'Й' => 'y', 'К' => 'k', 'Л' => 'l', 'М' => 'm', 'Н' => 'n', 'О' => 'o', 'П' => 'p', 'Р' => 'r', 'С' => 's', 'Т' => 't', 'У' => 'u', 'Ф' => 'f', 'Х' => 'h', 'Ц' => 'c', 'Ч' => 'ch', 'Ш' => 'sh', 'Щ' => 'sch', 'Ъ' => '', 'Ы' => 'y', 'Ь' => '', 'Э' => 'e', 'Ю' => 'yu', 'Я' => 'ya'];
-    $slug = strtr($title, $map);
-    $slug = mb_strtolower($slug);
-    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+    $slug = preg_replace('/[^a-z0-9]+/', '-', mb_strtolower(strtr($title, $map)));
     $slug = trim($slug, '-');
-    if ($slug === '') {
-        $slug = 'event';
-    }
-    return mb_substr($slug, 0, 140);
+    return mb_substr($slug === '' ? 'event' : $slug, 0, 140);
 }
 
 function checkinUrl($token)
 {
-    $protocol = 'http';
-    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
-        $protocol = 'https';
-    }
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost:8000';
     $path = rtrim(str_replace(basename($_SERVER['SCRIPT_NAME'] ?? ''), '', $_SERVER['SCRIPT_NAME'] ?? '/'), '/');
-    return $protocol . '://' . $host . $path . '/participants.php?token=' . urlencode($token);
+    return $protocol . '://' . $host . $path . '/office.php?p=people&token=' . urlencode($token);
 }
 
 function canEditEvent($user, $event)
@@ -261,10 +239,26 @@ function canEditEvent($user, $event)
     return $user['role_code'] === 'organizer' && (int) $event['organizer_id'] === (int) $user['id'];
 }
 
+function eventById($pdo, $id)
+{
+    $stmt = $pdo->prepare('SELECT e.*, c.name AS category_name, v.name AS venue_name, v.address AS venue_address FROM events e INNER JOIN categories c ON c.id = e.category_id LEFT JOIN venues v ON v.id = e.venue_id WHERE e.id = ?');
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+function showMessage($message, $error)
+{
+    if ($message) {
+        echo '<div class="message">' . e($message) . '</div>';
+    }
+    if ($error) {
+        echo '<div class="message error">' . e($error) . '</div>';
+    }
+}
+
 function xlsxText($value)
 {
-    $text = (string) $value;
-    $text = preg_replace('/[^\x{0009}\x{000A}\x{000D}\x{0020}-\x{D7FF}\x{E000}-\x{FFFD}]/u', '', $text);
+    $text = preg_replace('/[^\x{0009}\x{000A}\x{000D}\x{0020}-\x{D7FF}\x{E000}-\x{FFFD}]/u', '', (string) $value);
     return htmlspecialchars($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
 }
 
@@ -294,19 +288,18 @@ function zipStore($files)
         $offset += 30 + $nameSize + $size;
     }
     $count = count($files);
-    $end = pack('VvvvvVVv', 0x06054b50, 0, 0, $count, $count, strlen($central), $offset, 0);
-    return $local . $central . $end;
+    return $local . $central . pack('VvvvvVVv', 0x06054b50, 0, 0, $count, $count, strlen($central), $offset, 0);
 }
 
 function sendXlsx($filename, $sheetName, $headers, $rows)
 {
-    $xmlHead = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    $head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
     $files = [];
-    $files['[Content_Types].xml'] = $xmlHead . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>';
-    $files['_rels/.rels'] = $xmlHead . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
-    $files['xl/workbook.xml'] = $xmlHead . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' . xlsxText($sheetName) . '" sheetId="1" r:id="rId1"/></sheets></workbook>';
-    $files['xl/_rels/workbook.xml.rels'] = $xmlHead . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>';
-    $sheet = $xmlHead . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+    $files['[Content_Types].xml'] = $head . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>';
+    $files['_rels/.rels'] = $head . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+    $files['xl/workbook.xml'] = $head . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' . xlsxText($sheetName) . '" sheetId="1" r:id="rId1"/></sheets></workbook>';
+    $files['xl/_rels/workbook.xml.rels'] = $head . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>';
+    $sheet = $head . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
     $lineNumber = 1;
     foreach (array_merge([$headers], $rows) as $line) {
         $sheet .= '<row r="' . $lineNumber . '">';
@@ -318,11 +311,98 @@ function sendXlsx($filename, $sheetName, $headers, $rows)
         $sheet .= '</row>';
         $lineNumber++;
     }
-    $sheet .= '</sheetData></worksheet>';
-    $files['xl/worksheets/sheet1.xml'] = $sheet;
+    $files['xl/worksheets/sheet1.xml'] = $sheet . '</sheetData></worksheet>';
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Cache-Control: no-store');
     echo zipStore($files);
     exit;
+}
+
+function sendCsv($filename, $headers, $rows)
+{
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    echo "\xEF\xBB\xBF";
+    $out = fopen('php://output', 'w');
+    fputcsv($out, $headers, ';');
+    foreach ($rows as $row) {
+        fputcsv($out, $row, ';');
+    }
+    fclose($out);
+    exit;
+}
+
+function pageStart($title, $pdo, $user)
+{
+    $platform = getSetting($pdo, 'platform_title', 'Prestige Events');
+    $unread = 0;
+    if ($user) {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
+        $stmt->execute([$user['id']]);
+        $unread = (int) $stmt->fetchColumn();
+    }
+?>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><?= e($title) ?> — <?= e($platform) ?></title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top">
+<div class="wrap top-grid">
+<div class="meta"><span>Находится в</span><strong>Краснодар, ИМСИТ</strong></div>
+<div class="meta"><span>Платформа</span><strong><?= e($platform) ?></strong></div>
+<div class="meta"><span>Мероприятия</span><strong>Афиша и запись</strong></div>
+<button class="menu-btn" id="menuBtn" type="button">Меню</button>
+<nav class="nav" id="mainNav">
+<a href="index.php">Афиша</a>
+<?php if (!$user): ?>
+<a href="account.php?p=login">Вход</a>
+<a href="account.php?p=register">Регистрация</a>
+<?php else: ?>
+<a href="account.php?p=cabinet">Кабинет<span id="unreadCount"><?= $unread > 0 ? ' (' . $unread . ')' : '' ?></span></a>
+<?php if ($user['role_code'] === 'organizer' || $user['role_code'] === 'admin'): ?>
+<a href="office.php">Организатор</a>
+<?php endif; ?>
+<?php if ($user['role_code'] === 'admin'): ?>
+<a href="admin.php">Админ</a>
+<?php endif; ?>
+<a href="account.php?p=logout">Выйти</a>
+<?php endif; ?>
+</nav>
+</div>
+<?php if ($user): ?>
+<div class="wrap user-line"><?= e(fullName($user)) ?> · <?= e($user['role_name']) ?></div>
+<?php endif; ?>
+</header>
+<main class="wrap">
+<?php
+}
+
+function pageEnd()
+{
+?>
+</main>
+<footer class="footer">
+<div class="wrap footer-grid">
+<div class="footer-word">PRESTIGE</div>
+<div>
+<p>Prestige Events — платформа учёта мероприятий и участников.</p>
+<p>ИМСИТ, Краснодар, <?= date('Y') ?></p>
+</div>
+<div>
+<a href="index.php">Афиша</a>
+<a href="account.php?p=login">Вход</a>
+<a href="account.php?p=register">Регистрация</a>
+</div>
+</div>
+</footer>
+<script src="assets/app.js"></script>
+</body>
+</html>
+<?php
 }
