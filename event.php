@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $ins = $pdo->prepare('INSERT INTO waitlist (event_id, user_id, position, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
                                 $ins->execute([$id, $user['id'], $waitCount + 1, 'waiting', $now, $now]);
                             }
-                            notify($pdo, $user['id'], $id, 'waitlist', 'Лист ожидания', 'Вы добавлены в лист ожидания на мероприятие «' . $event['title'] . '». Позиция: ' . ($waitCount + 1));
+                            notify($pdo, $user['id'], $id, 'waitlist', 'Лист ожидания', 'Вы добавлены в лист ожидания на мероприятие «' . $event['title'] . '». Позиция: ' . ($waitCount + 1), true);
                             logAction($pdo, $user['id'], 'waitlist_add', 'events', $id);
                             redirect('event.php?id=' . $id . '&msg=' . urlencode('Мест нет. Вы добавлены в лист ожидания.'));
                         }
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $ins = $pdo->prepare('INSERT INTO registrations (event_id, user_id, status, qr_token, registered_at) VALUES (?, ?, ?, ?, ?)');
                         $ins->execute([$id, $user['id'], 'registered', $token, $now]);
                     }
-                    notify($pdo, $user['id'], $id, 'registration', 'Запись подтверждена', 'Вы записаны на мероприятие «' . $event['title'] . '». Токен билета: ' . $token);
+                    notify($pdo, $user['id'], $id, 'registration', 'Запись подтверждена', 'Вы записаны на мероприятие «' . $event['title'] . '». Токен билета: ' . $token, true);
                     logAction($pdo, $user['id'], 'register', 'events', $id);
                     redirect('event.php?id=' . $id . '&msg=' . urlencode('Вы записаны. Билет с токеном ниже и в личном кабинете.'));
                 }
@@ -163,7 +163,7 @@ require __DIR__ . '/includes/header.php';
 <p><strong>Окончание:</strong> <?= formatDate($event['ends_at']) ?></p>
 <p><strong>Площадка:</strong> <?= e($event['venue_name'] ?? 'Уточняется') ?><?php if (!empty($event['venue_address'])): ?><br><span class="grey"><?= e($event['venue_address']) ?></span><?php endif; ?></p>
 <p><strong>Мест:</strong> <?= $event['capacity'] !== null ? e($event['capacity']) : 'без ограничения' ?></p>
-<p><strong>Свободно:</strong> <?= $free === null ? 'без ограничения' : $free ?></p>
+<p><strong>Свободно:</strong> <span id="freePlaces"><?= $free === null ? 'без ограничения' : $free ?></span> <button type="button" class="btn btn-light btn-small" id="refreshFree" data-event="<?= (int) $event['id'] ?>">Обновить</button></p>
 <?php if ($event['registration_closes_at']): ?>
 <p><strong>Запись до:</strong> <?= formatDate($event['registration_closes_at']) ?></p>
 <?php endif; ?>

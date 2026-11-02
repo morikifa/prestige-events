@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $ins = $pdo->prepare('INSERT INTO event_program (event_id, title, speaker, place, starts_at, ends_at, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)');
                 $ins->execute([$id, $programItem['title'], $programItem['speaker'] !== '' ? $programItem['speaker'] : null, $programItem['place'] !== '' ? $programItem['place'] : null, $programItem['starts_at'], $programItem['ends_at'], $programItem['sort_order']]);
-                logAction($pdo, $user['id'], 'program_create', 'event_program', (int) $pdo->lastInsertId());
+                logAction($pdo, $user['id'], 'program_create', 'event_program', insertedId($pdo));
             }
             redirect('event_edit.php?id=' . $id . '&msg=' . urlencode('Программа сохранена в базе данных.') . '#program');
         }
@@ -124,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $ins = $pdo->prepare('INSERT INTO events (title, slug, category_id, venue_id, organizer_id, description, capacity, registration_opens_at, registration_closes_at, starts_at, ends_at, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
             $ins->execute([$event['title'], $slug, $event['category_id'], $event['venue_id'], $user['id'], $event['description'] !== '' ? $event['description'] : null, $event['capacity'], $event['registration_opens_at'], $event['registration_closes_at'], $event['starts_at'], $event['ends_at'], $event['status'], nowText(), nowText()]);
-            $newId = (int) $pdo->lastInsertId();
+            $newId = insertedId($pdo);
             logAction($pdo, $user['id'], 'event_create', 'events', $newId);
             redirect('event_edit.php?id=' . $newId . '&msg=' . urlencode('Мероприятие добавлено в базу. Теперь можно добавить программу ниже.') . '#program');
         }

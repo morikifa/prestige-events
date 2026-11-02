@@ -37,9 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $roleId = (int) $stmt->fetchColumn();
             $ins = $pdo->prepare('INSERT INTO users (role_id, last_name, first_name, middle_name, email, phone, password_hash, status, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
             $ins->execute([$roleId, $values['last_name'], $values['first_name'], $values['middle_name'] !== '' ? $values['middle_name'] : null, $values['email'], $values['phone'] !== '' ? $values['phone'] : null, password_hash($password, PASSWORD_DEFAULT), 'active', nowText(), nowText(), nowText()]);
-            $newId = (int) $pdo->lastInsertId();
+            $newId = insertedId($pdo);
             $_SESSION['user_id'] = $newId;
-            notify($pdo, $newId, null, 'welcome', 'Добро пожаловать в Prestige Events', 'Учётная запись участника создана. Теперь можно записываться на мероприятия из афиши.');
+            notify($pdo, $newId, null, 'welcome', 'Добро пожаловать в Prestige Events', 'Учётная запись участника создана. Теперь можно записываться на мероприятия из афиши.', true);
             logAction($pdo, $newId, 'register_account', 'users', $newId);
             redirect('cabinet.php');
         }

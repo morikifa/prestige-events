@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $ins = $pdo->prepare('INSERT INTO categories (name, description, created_at) VALUES (?, ?, ?)');
                     $ins->execute([$name, $description !== '' ? $description : null, nowText()]);
-                    logAction($pdo, $user['id'], 'category_create', 'categories', (int) $pdo->lastInsertId());
+                    logAction($pdo, $user['id'], 'category_create', 'categories', insertedId($pdo));
                 }
                 redirect('categories.php?msg=' . urlencode('Категория сохранена в базе данных.'));
             } catch (PDOException $ex) {

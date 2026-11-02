@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $parts = $pdo->prepare("SELECT user_id FROM registrations WHERE event_id = ? AND status IN ('registered', 'confirmed')");
                     $parts->execute([$eventId]);
                     foreach ($parts->fetchAll() as $part) {
-                        notify($pdo, $part['user_id'], $eventId, 'event_cancelled', 'Мероприятие отменено', 'Мероприятие «' . $event['title'] . '» отменено организатором.');
+                        notify($pdo, $part['user_id'], $eventId, 'event_cancelled', 'Мероприятие отменено', 'Мероприятие «' . $event['title'] . '» отменено организатором.', true);
                     }
                 }
                 logAction($pdo, $user['id'], 'event_status_' . $status, 'events', $eventId);
@@ -72,7 +72,7 @@ require __DIR__ . '/includes/header.php';
 <div class="card"><strong><?= $totalAttended ?></strong><span>Отмечено посещений</span></div>
 </div>
 
-<p class="actions"><a class="btn" href="event_edit.php">Новое мероприятие</a> <a class="btn btn-light" href="export.php?mode=summary">Скачать сводку CSV</a></p>
+<p class="actions"><a class="btn" href="event_edit.php">Новое мероприятие</a> <a class="btn btn-light" href="export.php?mode=summary&format=xlsx">Отчёт XLSX</a> <a class="btn btn-light" href="export.php?mode=summary">Сводка CSV</a></p>
 
 <h3 class="section">Мероприятия и сводка</h3>
 <p class="grey">Колонки «Посетило», «Ожидание» и «Заполнено» считаются из таблиц registrations и waitlist при открытии страницы. Для администратора здесь показаны все мероприятия, для организатора — только свои.</p>
