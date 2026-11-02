@@ -26,8 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($admins as $admin) {
                     notify($pdo, $admin['id'], null, 'password_reset', 'Запрос на восстановление пароля', 'Пользователь ' . fullName($found) . ' (' . $found['email'] . ') запросил восстановление пароля. Задайте новый пароль в разделе «Пользователи».');
                 }
-                $ins = $pdo->prepare('INSERT INTO notifications (user_id, event_id, type, channel, subject, message, status, is_read, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, 0, ?)');
-                $ins->execute([$found['id'], 'password_reset', 'email', 'Восстановление пароля Prestige Events', 'Запрос на восстановление пароля получен. Администратор задаст временный пароль и сообщит его лично.', 'pending', nowText()]);
+                queueEmail($pdo, $found['id'], null, 'password_reset', 'Восстановление пароля Prestige Events', 'Запрос на восстановление пароля получен. Администратор задаст временный пароль и сообщит его лично.');
                 logAction($pdo, $found['id'], 'password_reset_request', 'users', $found['id']);
             }
             $message = 'Если учётная запись с таким email есть, запрос отправлен администратору. Он задаст временный пароль в разделе «Пользователи» и сообщит его лично.';

@@ -21,6 +21,17 @@ if ($editId > 0) {
 }
 
 $roles = $pdo->query('SELECT * FROM roles ORDER BY id ASC')->fetchAll();
+$systemRoles = ['guest', 'participant', 'organizer', 'admin'];
+$roleEditId = (int) ($_GET['role_edit'] ?? 0);
+$roleEdit = ['code' => '', 'name' => '', 'description' => ''];
+if ($roleEditId > 0) {
+    $stmt = $pdo->prepare('SELECT * FROM roles WHERE id = ?');
+    $stmt->execute([$roleEditId]);
+    $foundRole = $stmt->fetch();
+    if ($foundRole) {
+        $roleEdit = $foundRole;
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     checkCsrf();
@@ -37,6 +48,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('users.php?msg=' . urlencode('Пользователь удалён. Связанные записи и уведомления удалены по внешним ключам, журнал действий сохранён.'));
         } catch (PDOException $ex) {
             redirect('users.php?err=' . urlencode('Нельзя удалить пользователя: он является организатором мероприятий. Сначала измените или удалите его мероприятия.'));
+        }
+    }
+    if ($action === 'role_save') {
+        $roleEditId = (int) ($_POST['item_id'] ?? 0);
+        $code = trim($_POST['code'] ?? '');
+        $name = trim($_POST['name'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $roleEdit = ['code' => $code, 'name' => $name, 'description' => $description];
+        if ($code === '' || $name === '' || !preg_match('/^[a-z][a-z0-9_]*$/', $code)) {
+            $error = 'Код роли — латинские буквы, цифры и подчёркивание с буквы в начале; название обязательно.';
+        } elseif ($roleEditId > 0) {
+            $stmt = $pdo->prepare('SELECT code FROM roles WHERE id = ?');
+            $stmt->execute([$roleEditId]);
+            $oldCode = $stmt->fetchColumn();
+            if (!$oldCode) {
+                redirect('users.php#roles');
+            }
+            if (in_array($oldCode, $systemRoles, true) && $code !== $oldCode) {
+                $error = 'Код системной роли менять нельзя: от него зависит разграничение прав.';
+            } else {
+                try {
+                    $upd = $pdo->prepare('UPDATE roles SET code = ?, name = ?, description = ? WHERE id = ?');
+                    $upd->execute([$code, $name, $description !== '' ? $description : null, $roleEditId]);
+                    logAction($pdo, $user['id'], 'role_update', 'roles', $roleEditId);
+                    redirect('users.php?msg=' . urlencode('Роль обновлена в базе данных.') . '#roles');
+                } catch (PDOException $ex) {
+                    $error = 'Роль с таким кодом уже есть.';
+                }
+            }
+        } else {
+            try {
+                $ins = $pdo->prepare('INSERT INTO roles (code, name, description) VALUES (?, ?, ?)');
+                $ins->execute([$code, $name, $description !== '' ? $description : null]);
+                logAction($pdo, $user['id'], 'role_create', 'roles', insertedId($pdo));
+                redirect('users.php?msg=' . urlencode('Роль добавлена в базу данных.') . '#roles');
+            } catch (PDOException $ex) {
+                $error = 'Роль с таким кодом уже есть.';
+            }
+        }
+    }
+    if ($action === 'role_delete') {
+        $delId = (int) ($_POST['item_id'] ?? 0);
+        $stmt = $pdo->prepare('SELECT code FROM roles WHERE id = ?');
+        $stmt->execute([$delId]);
+        $code = (string) $stmt->fetchColumn();
+        if (in_array($code, $systemRoles, true)) {
+            $error = 'Системные роли удалять нельзя: на них завязаны права доступа.';
+        } else {
+            try {
+                $del = $pdo->prepare('DELETE FROM roles WHERE id = ?');
+                $del->execute([$delId]);
+                logAction($pdo, $user['id'], 'role_delete', 'roles', $delId);
+                redirect('users.php?msg=' . urlencode('Роль удалена из базы данных.') . '#roles');
+            } catch (PDOException $ex) {
+                $error = 'Роль используется пользователями. Сначала назначьте им другую роль.';
+            }
         }
     }
     if ($action === 'user_save') {
@@ -74,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $ins = $pdo->prepare('INSERT INTO users (role_id, last_name, first_name, middle_name, email, phone, password_hash, status, email_verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
                     $ins->execute([$edit['role_id'], $edit['last_name'], $edit['first_name'], $edit['middle_name'] !== '' ? $edit['middle_name'] : null, $edit['email'], $edit['phone'] !== '' ? $edit['phone'] : null, password_hash($password, PASSWORD_DEFAULT), $edit['status'], nowText(), nowText(), nowText()]);
-                    logAction($pdo, $user['id'], 'user_create', 'users', (int) $pdo->lastInsertId());
+                    logAction($pdo, $user['id'], 'user_create', 'users', insertedId($pdo));
                     redirect('users.php?msg=' . urlencode('Пользователь добавлен в базу данных.'));
                 }
             }
@@ -92,7 +159,7 @@ require __DIR__ . '/includes/header.php';
 <?php if ($message): ?><div class="message"><?= e($message) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="message error"><?= e($error) ?></div><?php endif; ?>
 
-<p><a class="btn" href="users.php#user-form">Новый пользователь</a></p>
+<p class="actions"><a class="btn" href="users.php#user-form">Новый пользователь</a> <a class="btn btn-light" href="users.php#roles">Роли и права</a></p>
 <table style="margin-top:18px">
 <tr><th>ID</th><th>ФИО</th><th>Логин / Email</th><th>Телефон</th><th>Роль в БД</th><th>Статус</th><th></th></tr>
 <?php foreach ($rows as $row): ?>
@@ -152,5 +219,39 @@ require __DIR__ . '/includes/header.php';
 <div class="full"><label><?= $editId > 0 ? 'Новый пароль (пусто — не менять)' : 'Пароль *' ?></label><input type="text" name="password" placeholder="Например: 1234"></div>
 </div>
 <p style="margin-top:16px"><button class="btn" type="submit">Сохранить в базу</button> <a class="btn btn-light" href="users.php">Сбросить форму</a></p>
+</form>
+<h3 class="section" id="roles">Роли</h3>
+<p class="lead">Таблица roles. Четыре системные роли задают права доступа, их код менять нельзя. Названия и описания правятся, свои роли можно добавить и удалить.</p>
+<table>
+<tr><th>ID</th><th>Код</th><th>Название</th><th>Описание</th><th>Пользователей</th><th></th></tr>
+<?php foreach ($roles as $role): ?>
+<?php $stmt = $pdo->prepare('SELECT COUNT(*) FROM users WHERE role_id = ?'); $stmt->execute([$role['id']]); $roleCount = (int) $stmt->fetchColumn(); ?>
+<tr>
+<td><?= (int) $role['id'] ?></td>
+<td><span class="badge"><?= e($role['code']) ?></span></td>
+<td><strong><?= e($role['name']) ?></strong></td>
+<td><?= e($role['description'] ?? '') ?></td>
+<td><?= $roleCount ?></td>
+<td><div class="actions">
+<a class="btn btn-light btn-small" href="users.php?role_edit=<?= (int) $role['id'] ?>#role-form">Изменить</a>
+<?php if (!in_array($role['code'], $systemRoles, true)): ?>
+<form method="post" data-confirm="Удалить роль из базы?"><?= csrfField() ?><input type="hidden" name="action" value="role_delete"><input type="hidden" name="item_id" value="<?= (int) $role['id'] ?>"><button class="btn btn-small" type="submit">Удалить</button></form>
+<?php endif; ?>
+</div></td>
+</tr>
+<?php endforeach; ?>
+</table>
+
+<h3 class="section" id="role-form"><?= $roleEditId > 0 ? 'Изменить роль' : 'Добавить роль' ?></h3>
+<form class="form-box" method="post">
+<?= csrfField() ?>
+<input type="hidden" name="action" value="role_save">
+<input type="hidden" name="item_id" value="<?= $roleEditId ?>">
+<div class="form-grid">
+<div><label>Код *</label><input type="text" name="code" required maxlength="32" value="<?= e($roleEdit['code']) ?>"></div>
+<div><label>Название *</label><input type="text" name="name" required maxlength="64" value="<?= e($roleEdit['name']) ?>"></div>
+<div class="full"><label>Описание</label><input type="text" name="description" maxlength="255" value="<?= e($roleEdit['description'] ?? '') ?>"></div>
+</div>
+<p style="margin-top:14px"><button class="btn" type="submit">Сохранить в базу</button> <a class="btn btn-light" href="users.php#roles">Сбросить</a></p>
 </form>
 <?php require __DIR__ . '/includes/footer.php'; ?>

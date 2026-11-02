@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$eventId]);
             $rows = $stmt->fetchAll();
             foreach ($rows as $row) {
-                notify($pdo, $row['user_id'], $eventId, 'organizer_message', $subject, $text);
+                notify($pdo, $row['user_id'], $eventId, 'organizer_message', $subject, $text, true);
             }
             logAction($pdo, $user['id'], 'notify_participants', 'events', $eventId);
             redirect('participants.php?event_id=' . $eventId . '&msg=' . urlencode('Уведомление отправлено участникам: ' . count($rows)));
@@ -123,7 +123,7 @@ require __DIR__ . '/includes/header.php';
 
 <p class="actions">
 <a class="btn btn-light" href="export.php?event_id=<?= $eventId ?>&format=csv">Список CSV</a>
-<a class="btn btn-light" href="export.php?event_id=<?= $eventId ?>&format=xls">Список Excel (XLS)</a>
+<a class="btn btn-light" href="export.php?event_id=<?= $eventId ?>&format=xlsx">Список XLSX</a>
 <a class="btn btn-light" href="event_edit.php?id=<?= $eventId ?>#program">Программа</a>
 </p>
 

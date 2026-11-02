@@ -30,7 +30,7 @@ $platformTitle = isset($pdo) ? getSetting($pdo, 'platform_title', 'Prestige Even
 <a href="login.php">Вход</a>
 <a href="register.php">Регистрация</a>
 <?php else: ?>
-<a href="cabinet.php">Кабинет<?php if ($unreadCount > 0): ?> (<?= $unreadCount ?>)<?php endif; ?></a>
+<a href="cabinet.php">Кабинет<span id="unreadCount"><?php if ($unreadCount > 0): ?> (<?= $unreadCount ?>)<?php endif; ?></span></a>
 <?php if ($headerUser['role_code'] === 'organizer' || $headerUser['role_code'] === 'admin'): ?>
 <a href="organizer.php">Организатор</a>
 <?php endif; ?>

@@ -8,6 +8,17 @@ function e($value)
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
+function insertedId($pdo)
+{
+    if (($GLOBALS['dbType'] ?? 'sqlite') === 'sqlsrv') {
+        $value = $pdo->query('SELECT CAST(@@IDENTITY AS INT)')->fetchColumn();
+        if ($value !== false && $value !== null) {
+            return (int) $value;
+        }
+    }
+    return (int) $pdo->lastInsertId();
+}
+
 function redirect($url)
 {
     header('Location: ' . $url);
@@ -102,10 +113,20 @@ function logAction($pdo, $userId, $action, $entity, $entityId)
     }
 }
 
-function notify($pdo, $userId, $eventId, $type, $subject, $message)
+function notify($pdo, $userId, $eventId, $type, $subject, $message, $withEmail = false)
 {
     $stmt = $pdo->prepare('INSERT INTO notifications (user_id, event_id, type, channel, subject, message, status, is_read, created_at, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)');
     $stmt->execute([$userId, $eventId, $type, 'web', $subject, $message, 'sent', nowText(), nowText()]);
+    if ($withEmail) {
+        queueEmail($pdo, $userId, $eventId, $type, $subject, $message);
+    }
+}
+
+function queueEmail($pdo, $userId, $eventId, $type, $subject, $message)
+{
+    $sender = getSetting($pdo, 'email_sender_name', 'Prestige Events');
+    $stmt = $pdo->prepare('INSERT INTO notifications (user_id, event_id, type, channel, subject, message, status, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)');
+    $stmt->execute([$userId, $eventId, $type, 'email', $subject, 'Отправитель: ' . $sender . "\r\n\r\n" . $message, 'pending', nowText()]);
 }
 
 function getSetting($pdo, $key, $defaultValue)
@@ -178,7 +199,7 @@ function promoteWaitlist($pdo, $eventId)
     }
     $upd = $pdo->prepare("UPDATE waitlist SET status = 'registered', updated_at = ? WHERE id = ?");
     $upd->execute([nowText(), $first['id']]);
-    notify($pdo, $first['user_id'], $eventId, 'waitlist', 'Освободилось место', 'Вы записаны на мероприятие «' . $event['title'] . '». Токен билета: ' . $token);
+    notify($pdo, $first['user_id'], $eventId, 'waitlist', 'Освободилось место', 'Вы записаны на мероприятие «' . $event['title'] . '». Токен билета: ' . $token, true);
 }
 
 function eventStatusName($status)
@@ -238,4 +259,70 @@ function canEditEvent($user, $event)
         return true;
     }
     return $user['role_code'] === 'organizer' && (int) $event['organizer_id'] === (int) $user['id'];
+}
+
+function xlsxText($value)
+{
+    $text = (string) $value;
+    $text = preg_replace('/[^\x{0009}\x{000A}\x{000D}\x{0020}-\x{D7FF}\x{E000}-\x{FFFD}]/u', '', $text);
+    return htmlspecialchars($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
+}
+
+function xlsxCol($index)
+{
+    $letters = '';
+    $number = $index + 1;
+    while ($number > 0) {
+        $number--;
+        $letters = chr(65 + ($number % 26)) . $letters;
+        $number = intdiv($number, 26);
+    }
+    return $letters;
+}
+
+function zipStore($files)
+{
+    $local = '';
+    $central = '';
+    $offset = 0;
+    foreach ($files as $name => $data) {
+        $crc = crc32($data);
+        $size = strlen($data);
+        $nameSize = strlen($name);
+        $local .= pack('VvvvvvVVVvv', 0x04034b50, 20, 0, 0, 0, 0, $crc, $size, $size, $nameSize, 0) . $name . $data;
+        $central .= pack('VvvvvvvVVVvvvvvVV', 0x02014b50, 20, 20, 0, 0, 0, 0, $crc, $size, $size, $nameSize, 0, 0, 0, 0, 0, $offset) . $name;
+        $offset += 30 + $nameSize + $size;
+    }
+    $count = count($files);
+    $end = pack('VvvvvVVv', 0x06054b50, 0, 0, $count, $count, strlen($central), $offset, 0);
+    return $local . $central . $end;
+}
+
+function sendXlsx($filename, $sheetName, $headers, $rows)
+{
+    $xmlHead = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    $files = [];
+    $files['[Content_Types].xml'] = $xmlHead . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>';
+    $files['_rels/.rels'] = $xmlHead . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+    $files['xl/workbook.xml'] = $xmlHead . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' . xlsxText($sheetName) . '" sheetId="1" r:id="rId1"/></sheets></workbook>';
+    $files['xl/_rels/workbook.xml.rels'] = $xmlHead . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>';
+    $sheet = $xmlHead . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+    $lineNumber = 1;
+    foreach (array_merge([$headers], $rows) as $line) {
+        $sheet .= '<row r="' . $lineNumber . '">';
+        $column = 0;
+        foreach (array_values($line) as $value) {
+            $sheet .= '<c r="' . xlsxCol($column) . $lineNumber . '" t="inlineStr"><is><t xml:space="preserve">' . xlsxText($value) . '</t></is></c>';
+            $column++;
+        }
+        $sheet .= '</row>';
+        $lineNumber++;
+    }
+    $sheet .= '</sheetData></worksheet>';
+    $files['xl/worksheets/sheet1.xml'] = $sheet;
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-store');
+    echo zipStore($files);
+    exit;
 }

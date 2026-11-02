@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $ins = $pdo->prepare('INSERT INTO venues (name, address, capacity, created_at) VALUES (?, ?, ?, ?)');
                 $ins->execute([$name, $address, $capacity, nowText()]);
-                logAction($pdo, $user['id'], 'venue_create', 'venues', (int) $pdo->lastInsertId());
+                logAction($pdo, $user['id'], 'venue_create', 'venues', insertedId($pdo));
             }
             redirect('venues.php?msg=' . urlencode('Площадка сохранена в базе данных.'));
         }
